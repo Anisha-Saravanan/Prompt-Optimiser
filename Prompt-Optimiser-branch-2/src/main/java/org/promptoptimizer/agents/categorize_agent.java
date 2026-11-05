@@ -42,6 +42,12 @@ public class categorize_agent implements ClassificationAgent {
         String requestPrompt = instructionPrompt.isBlank()
                 ? normalizedPrompt
                 : instructionPrompt + "\n\nPrompt to classify:\n" + normalizedPrompt;
+        return generate(requestPrompt);
+    }
+
+    @Override
+    public String generate(String requestPrompt) throws IOException, InterruptedException {
+        Objects.requireNonNull(requestPrompt);
         String json = "{\"prompt\":\"" + escapeJson(requestPrompt) + "\",\"think\":false}";
 
         HttpRequest request = HttpRequest.newBuilder()
