@@ -6,8 +6,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import org.promptoptimizer.agents.KaggleAgent;
+import org.promptoptimizer.agents.PromptChecker;
+import org.promptoptimizer.agents.PromptChecker.CheckResult;
 import org.promptoptimizer.ingest.Canonicalizer;
 import org.promptoptimizer.model.Model.CanonicalDocument;
 import org.promptoptimizer.model.Model.InformationUnit;
@@ -20,10 +24,25 @@ import org.promptoptimizer.token.HeuristicTokenCounter;
 /** Offline command-line demo of prompt profiling and segmentation. */
 public final class PipelineDemo {
     private static final long MAX_DOCUMENT_BYTES = 8L * 1024 * 1024;
+    private static final int FEEDBACK_ITERATIONS = 5;
     private static final Pattern OUTPUT_CUE = Pattern.compile(
             "(?i)\\b(?:return|output|provide)\\b.*\\b(?:code|source|format|report|json|markdown)\\b");
     private static final String DEFAULT_PROMPT =
-            "Develop a Python-based library management system that helps librarians manage books, registered users, and borrowing activities efficiently. The system should allow librarians to add new books to the collection and remove books that are no longer available. Each book must have its title, author, ISBN, publication year, and available copy count recorded. Librarians should be able to search for books using their title, author, or ISBN without manually browsing the entire collection. The system must also support user registration and store details such as name, user ID, and contact information. Registered users should be able to borrow available books, with the system recording the borrowing date and expected return date for each transaction. When a book is returned, its availability and copy count should be updated automatically. The system should identify overdue books by comparing their return dates with the current date and notify librarians. Additionally, provide a dashboard showing the total number of books, registered users, borrowed books, and overdue books. Develop the application using Python without external libraries or third-party frameworks. Use built-in functionality wherever possible and ensure that library records are stored persistently so they remain available after restarting the application. Validate user inputs to prevent incomplete or invalid records. Keep the implementation modular, readable, and easy to maintain. Return the complete Python source code, organized into logical functions with comments explaining important operations. Avoid lengthy explanations outside the code.";
+            "Develop a Python-based student attendance management system for a college.\n" +
+                    "\n" +
+                    "The system must allow administrators to register students with their name, roll number, department, year of study, and email address. Each student must have a unique roll number.\n" +
+                    "\n" +
+                    "Teachers should be able to create attendance sessions for a specific subject, class, and date. They must be able to mark each student as present, absent, or late. Attendance records must store the student's roll number, subject, date, status, and the teacher who marked the attendance.\n" +
+                    "\n" +
+                    "Students should be able to view their attendance percentage for each subject. Calculate the percentage using the number of classes attended divided by the total number of classes conducted, multiplied by 100. Late attendance should count as half an attended class.\n" +
+                    "\n" +
+                    "The system must automatically identify students whose attendance percentage falls below 75% in any subject and display them in a separate warning list.\n" +
+                    "\n" +
+                    "Administrators should be able to search students by roll number or name and generate attendance reports for individual students and entire classes. Reports must include total classes, attended classes, absences, late arrivals, and attendance percentage.\n" +
+                    "\n" +
+                    "Use Python only, without external libraries or frameworks. Store all student details and attendance records persistently so that data remains available after the program restarts. Validate inputs, prevent duplicate roll numbers, and prevent teachers from marking attendance twice for the same student in the same subject and session.\n" +
+                    "\n" +
+                    "Organize the program into modular functions with clear comments. Return the complete source code without lengthy explanations.";
 
     private PipelineDemo() {}
 
@@ -36,16 +55,65 @@ public final class PipelineDemo {
 
         Canonicalizer canonicalizer = new Canonicalizer(MAX_DOCUMENT_BYTES);
         CanonicalDocument prompt = readPrompt(options.prompt(), canonicalizer);
+        String finalPrompt = optimizePrompt(prompt,
+                split -> {
+                    System.out.println("Input JSON:");
+                    System.out.println(split);
+                    System.out.flush();
+                },
+                (iteration, result) -> {
+                    System.out.printf("%nPrompt checker turn %d/%d%n", iteration, FEEDBACK_ITERATIONS);
+                    System.out.println("Raw agent output:");
+                    System.out.println(result.rawAgentOutput());
+                    if (result.noCorrectionsNeeded()) {
+                        System.out.println("No additions or corrections needed; stopping feedback loop.");
+                    } else {
+                        System.out.println("Parsed reasoning summary:");
+                        System.out.println(result.reasoning());
+                        System.out.println("Corrected prompt:");
+                        System.out.println(result.correctedPrompt());
+                    }
+                    System.out.flush();
+                });
+        System.out.println("\nFinal optimized prompt:");
+        System.out.println(finalPrompt);
+    }
+
+    /** Runs the existing profiling, optimization, and feedback workflow for one prompt. */
+    public static String optimizePrompt(String originalPrompt) throws IOException, InterruptedException {
+        if (originalPrompt == null || originalPrompt.isBlank()) {
+            throw new IllegalArgumentException("Prompt must not be blank.");
+        }
+        CanonicalDocument prompt = new Canonicalizer(MAX_DOCUMENT_BYTES).canonicalize("prompt", originalPrompt);
+        return optimizePrompt(prompt, ignored -> {}, (iteration, result) -> {});
+    }
+
+    private static String optimizePrompt(CanonicalDocument prompt, Consumer<String> onSplit,
+                                         BiConsumer<Integer, CheckResult> onReply)
+            throws IOException, InterruptedException {
         TaskProfile profile = new RuleBasedTaskProfiler().profile(prompt);
         List<InformationUnit> units = new ProfileSegmenter(profile)
                 .segment(prompt, new HeuristicTokenCounter());
         String split = formatSplit(prompt, units, profile);
-        System.out.println("Input JSON:");
-        System.out.println(split);
-        System.out.flush();
+        onSplit.accept(split);
         String optimized = new KaggleAgent().optimize(split);
-        System.out.println("\nOptimized JSON:");
-        System.out.println(optimized);
+        return runFeedbackLoop(split, optimized, new PromptChecker(), onReply);
+    }
+
+    static String runFeedbackLoop(String originalPrompt, String initialOptimizedPrompt, PromptChecker checker,
+                                  BiConsumer<Integer, CheckResult> onReply)
+            throws IOException, InterruptedException {
+        String previousPrompt = initialOptimizedPrompt;
+        for (int iteration = 1; iteration <= FEEDBACK_ITERATIONS; iteration++) {
+            CheckResult result = checker.check(originalPrompt, previousPrompt);
+            if (result.noCorrectionsNeeded()) {
+                onReply.accept(iteration, result);
+                break;
+            }
+            previousPrompt = result.correctedPrompt();
+            onReply.accept(iteration, result);
+        }
+        return previousPrompt;
     }
 
     static String formatSplit(CanonicalDocument prompt, List<InformationUnit> units, TaskProfile profile) {

@@ -16,7 +16,15 @@ java -cp target\classes org.promptoptimizer.PipelineDemo
 java -cp target\classes org.promptoptimizer.PipelineDemo --prompt request.txt
 ```
 
-Fill in `KAGGLE_API_URL` (the base URL, without `/generate`) and `KAGGLE_API_TOKEN` in the ignored project-root `.env` file. `.env.example` shows the required keys. `PipelineDemo` prints and sends grouped JSON with `TASK`, `REQUIREMENTS`, `CONSTRAINTS`, and `OUTPUT FORMAT` fields, then prints the agent's response as JSON. Requirement and constraint values are arrays to avoid repeated JSON keys. The prompt is sent to the configured external service.
+Fill in `KAGGLE_API_URL` (the base URL, without `/generate`) and `KAGGLE_API_TOKEN` in the ignored project-root `.env` file. `.env.example` shows the required keys. `PipelineDemo` prints and sends grouped JSON with `TASK`, `REQUIREMENTS`, `CONSTRAINTS`, and `OUTPUT FORMAT` fields, then runs up to five prompt-checker feedback iterations. Each turn prints the raw agent JSON and, when corrections are returned, its parsed reasoning summary and corrected prompt. The checker returns exactly `{}` when no corrections are needed, which stops the loop early; the final corrected prompt is printed afterward. The checker returns a concise rationale summary, not private step-by-step reasoning. Requirement and constraint values are arrays to avoid repeated JSON keys. The prompts are sent to the configured external service.
+
+Launch the JavaFX chat interface with:
+
+```powershell
+mvn javafx:run
+```
+
+The chat UI sends each submitted prompt through `PipelineDemo.optimizePrompt`, which runs the existing profiling, Kaggle optimization, and feedback-checking workflow. Only the final optimized prompt is added as an assistant message.
 
 Run the seeded, offline optimizer evaluation and export per-case CSV rows:
 

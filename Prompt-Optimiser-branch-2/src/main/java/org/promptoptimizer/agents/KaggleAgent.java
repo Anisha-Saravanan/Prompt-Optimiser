@@ -50,13 +50,31 @@ public final class KaggleAgent {
     }
 
     private static String extractResponse(String json) throws IOException {
-        String key = "\"response\":\"";
-        int start = json.indexOf(key);
-        if (start < 0) {
-            throw new IOException("Kaggle API response did not contain a response field.");
+        return extractJsonStringField(json, "response");
+    }
+
+    static String extractJsonStringField(String json, String field) throws IOException {
+        Objects.requireNonNull(json);
+        Objects.requireNonNull(field);
+        String key = "\"" + field + "\"";
+        int keyStart = json.indexOf(key);
+        if (keyStart < 0) {
+            throw new IOException("Kaggle response did not contain a '" + field + "' field.");
+        }
+        int start = keyStart + key.length();
+        while (start < json.length() && Character.isWhitespace(json.charAt(start))) {
+            start++;
+        }
+        if (start >= json.length() || json.charAt(start++) != ':') {
+            throw new IOException("Kaggle response contains an invalid '" + field + "' field.");
+        }
+        while (start < json.length() && Character.isWhitespace(json.charAt(start))) {
+            start++;
+        }
+        if (start >= json.length() || json.charAt(start++) != '"') {
+            throw new IOException("Kaggle response '" + field + "' field must be a string.");
         }
 
-        start += key.length();
         StringBuilder result = new StringBuilder();
         boolean escaped = false;
         for (int i = start; i < json.length(); i++) {
@@ -72,12 +90,12 @@ public final class KaggleAgent {
                     case 'f' -> result.append('\f');
                     case 'u' -> {
                         if (i + 4 >= json.length()) {
-                            throw new IOException("Kaggle API response contains an invalid Unicode escape.");
+                            throw new IOException("Kaggle response contains an invalid Unicode escape.");
                         }
                         try {
                             result.append((char) Integer.parseInt(json.substring(i + 1, i + 5), 16));
                         } catch (NumberFormatException e) {
-                            throw new IOException("Kaggle API response contains an invalid Unicode escape.", e);
+                            throw new IOException("Kaggle response contains an invalid Unicode escape.", e);
                         }
                         i += 4;
                     }
@@ -92,6 +110,6 @@ public final class KaggleAgent {
                 result.append(current);
             }
         }
-        throw new IOException("Kaggle API response contains a malformed response field.");
+        throw new IOException("Kaggle response contains a malformed '" + field + "' field.");
     }
 }
