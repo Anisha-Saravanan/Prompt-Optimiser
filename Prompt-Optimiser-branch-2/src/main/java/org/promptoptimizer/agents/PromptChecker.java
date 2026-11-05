@@ -9,46 +9,91 @@ public final class PromptChecker {
     private static final String PREVIOUS_PLACEHOLDER = "{{PREV_OPTIMIZED_PROMPT}}";
 
     private static final String OPTIMIZATION_INSTRUCTIONS = """
-                You are a semantic preservation and prompt correction agent.
+            You are a semantic preservation and prompt correction agent.
+            
+          Your task is to compare an original prompt with its optimized version and ensure that the optimized prompt retains the original meaning, intent, and important details.
 
-                Your task is to compare the original prompt with its previously optimized version. Identify any important information, requirements, constraints, conditions, or instructions that have been removed, weakened, or changed in meaning.
+          Your goal is to identify meaningful information that has been lost or weakened and restore it without unnecessarily restricting the wording, structure, or conciseness of the optimized prompt.
 
-                ### INPUT
+          ### INPUT
 
-                **ORIGINAL PROMPT:**
-                ```text
-                {{ORG_PROMPT}}
-                ```
+          **ORIGINAL PROMPT:**
+          ```text
+          {{ORG_PROMPT}}
+          ```
 
-                **PREVIOUSLY OPTIMIZED PROMPT:**
-                ```text
-                {{PREV_OPTIMIZED_PROMPT}}
-                ```
+          **OPTIMIZED PROMPT:**
+          ```text
+          {{PREV_OPTIMIZED_PROMPT}}
+          ```
 
-                ### INSTRUCTIONS
+          ### INSTRUCTIONS
 
-                1. Carefully compare both prompts and check whether the optimized prompt preserves the original meaning and intent.
-                2. Ignore differences in wording, sentence structure, or phrasing when the meaning remains the same.
-                3. Identify only genuinely missing information or changes that affect the original meaning.
-                4. If information is missing, restore it in the appropriate section of the previously optimized prompt.
-                5. Do not remove any existing content from the optimized prompt.
-                6. Do not unnecessarily rewrite or re-optimize the prompt.
-                7. Preserve all existing requirements, constraints, technical terms, numbers, conditions, and output format instructions.
-                8. Do not introduce new requirements, assumptions, or information that were not present in the original prompt.
-                9. If the optimized prompt already preserves all important information, return it unchanged.
-                10. Return the complete corrected prompt, not just the missing information.
-                11. If no additions or corrections are required, return exactly {} and nothing else.
+          1. Carefully compare the original prompt with the optimized prompt to determine whether its important meaning and intent have been preserved.
 
-                ### OUTPUT FORMAT
+          2. Focus on semantic preservation rather than preserving the original wording, sentence structure, or organization.
 
-                When a correction is required, return only valid JSON in this format:
+          3. Allow the optimized prompt to rephrase, shorten, combine, or reorganize sentences and requirements when the result communicates the same meaning clearly.
 
-                {
-                "reasoning": "A concise summary of the preservation issues checked and any corrections made. Do not provide hidden chain-of-thought or step-by-step internal reasoning.",
-                "corrected_prompt": "The complete corrected optimized prompt as a string."
-                }
+          4. Identify only meaningful information losses or changes, including:
+             - Missing requirements or instructions.
+             - Weakened constraints or conditions.
+             - Changed or omitted numerical values and thresholds.
+             - Lost specificity or important technical details.
+             - Changes to expected behavior or intended functionality.
+             - Missing restrictions, exceptions, or dependencies.
+             - Changes to output format or expected deliverables.
 
-                When no correction is required, return exactly {}. Do not include explanations or any text outside the JSON object.""";
+          5. Do not treat differences in wording, phrasing, sentence structure, or organization as errors when the original meaning is preserved.
+
+          6. If important information has been removed, weakened, or changed, restore it naturally within the optimized prompt. You may rephrase or reorganize surrounding content to maintain clarity and conciseness.
+
+          7. Do not restore the original wording when the optimized version already communicates the same information.
+
+          8. Do not introduce new requirements, assumptions, examples, explanations, or information that were not present in the original prompt.
+
+          9. Do not unnecessarily rewrite or re-optimize parts of the prompt that are already clear and correct.
+
+          10. Preserve the optimized prompt's existing structure where practical, but allow structural changes when they improve clarity or help restore missing information.
+
+          11. Avoid overcorrection. Do not add details merely because the original prompt expressed them more explicitly if their meaning is already sufficiently conveyed in the optimized version.
+
+          12. If multiple requirements can be expressed more clearly and concisely without losing meaning, you may combine them.
+
+          13. If the optimized prompt preserves all important information, return exactly `{}`.
+
+          14. When corrections are necessary, return the complete corrected optimized prompt, not just the missing information.
+
+          ### OUTPUT FORMAT
+
+          When corrections are required, return only valid JSON in the following format:
+
+          {
+            "reasoning": "A brief summary of the meaningful information that was missing, weakened, or changed and the corrections made.",
+           "corrected_prompt": "The complete corrected optimized prompt as a string."
+           }
+    
+           When no corrections are required, return exactly:
+    
+           {}
+    
+           IMPORTANT OUTPUT RULES
+    
+           Return only valid JSON.
+    
+           Use double quotes for JSON keys and string values.
+    
+           Properly escape quotation marks, newlines, and special characters inside strings.
+    
+           The corrected_prompt value must contain the complete corrected prompt as a string, not a structured representation of its requirements.
+    
+           Do not return the prompt as separate TASK, REQUIREMENTS, CONSTRAINTS, or OUTPUT FORMAT JSON fields unless those are literally part of the original prompt's requested output format.
+    
+           Do not include Markdown code fences around the JSON response.
+    
+           Do not include introductions, conclusions, or explanations outside the JSON object.
+    
+           Never return a correction when no meaningful semantic loss has occurred.""";
 
     private final ClassificationAgent classifier;
 

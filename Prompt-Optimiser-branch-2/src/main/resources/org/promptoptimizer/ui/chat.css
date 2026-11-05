@@ -40,8 +40,36 @@
     -fx-background-radius: 16px;
     -fx-border-radius: 16px;
     -fx-border-width: 1px;
+    -fx-control-inner-background: transparent;
     -fx-text-fill: #ececec;
+    -fx-highlight-fill: #565869;
+    -fx-highlight-text-fill: #ffffff;
     -fx-line-spacing: 3px;
+}
+
+.message-bubble .content,
+.message-bubble .scroll-pane,
+.message-bubble .scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.message-bubble .scroll-pane {
+    -fx-vbar-policy: never;
+    -fx-hbar-policy: never;
+}
+
+.message-bubble .scroll-bar {
+    -fx-opacity: 0;
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+    -fx-min-width: 0;
+    -fx-min-height: 0;
+    -fx-max-width: 0;
+    -fx-max-height: 0;
+}
+
+.message-bubble .text {
+    -fx-fill: #ececec;
 }
 
 .user-bubble {
