@@ -1,9 +1,11 @@
 package org.promptoptimizer.ui;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.text.Text;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -92,7 +94,7 @@ public final class PromptOptimizerApp extends Application {
 
         promptInput.clear();
         addMessage(prompt, true);
-        Label response = addMessage("Optimizing...", false);
+        TextArea response = addMessage("Optimizing...", false);
         promptInput.setDisable(true);
         sendButton.setDisable(true);
 
@@ -116,18 +118,35 @@ public final class PromptOptimizerApp extends Application {
         worker.start();
     }
 
-    private Label addMessage(String text, boolean user) {
-        Label bubble = new Label(text);
+    private TextArea addMessage(String text, boolean user) {
+        TextArea bubble = new TextArea(text);
+        bubble.setEditable(false);
         bubble.setWrapText(true);
+        bubble.setFocusTraversable(true);
         bubble.setMaxWidth(780);
         bubble.maxWidthProperty().bind(chatScroll.widthProperty().multiply(0.72));
         bubble.getStyleClass().addAll("message-bubble", user ? "user-bubble" : "assistant-bubble");
+        bubble.textProperty().addListener((observable, oldValue, newValue) -> resizeMessage(bubble));
+        bubble.widthProperty().addListener((observable, oldValue, newValue) -> resizeMessage(bubble));
+        Platform.runLater(() -> resizeMessage(bubble));
 
         HBox row = new HBox(bubble);
         row.setAlignment(user ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
         row.getStyleClass().add("message-row");
         messages.getChildren().add(row);
         return bubble;
+    }
+
+    private void resizeMessage(TextArea bubble) {
+        if (bubble.getWidth() <= 0) {
+            return;
+        }
+        Text measurement = new Text(bubble.getText());
+        measurement.setFont(bubble.getFont());
+        measurement.setWrappingWidth(Math.max(80, bubble.getWidth() - 42));
+        double contentHeight = measurement.getLayoutBounds().getHeight();
+        int lines = Math.max(1, bubble.getText().split("\n", -1).length);
+        bubble.setPrefHeight(Math.max(52, contentHeight + lines * 4 + 38));
     }
 
     private void setProcessing(boolean processing) {
